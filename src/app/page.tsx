@@ -15,8 +15,9 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import type { Lesson, AttendanceStatus, AttendanceRecord, Subject, AppUser } from '@/lib/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, CalendarDays, FileUp, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, CalendarDays, FileUp, BarChart2, Plus } from 'lucide-react'
 import { StatsTab } from '@/components/stats/StatsTab'
+import { SubjectCreateModal } from '@/components/dashboard/SubjectCreateModal'
 import { PushToggle } from '@/components/PushToggle'
 
 const INITIAL_USERS: AppUser[] = [
@@ -39,6 +40,7 @@ export default function Home() {
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [createSubjectOpen, setCreateSubjectOpen] = useState(false)
 
   // ── 初期データ読み込み ────────────────────────────────────────
   useEffect(() => {
@@ -180,6 +182,18 @@ export default function Home() {
     if (data) setLessons((prev) => [...prev, ...data.map((l: any) => ({ ...l, user_id: '' }))])
   }
 
+  const handleCreateSubject = async (data: Omit<Subject, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    const id = `custom_${Date.now()}`
+    const { data: row, error } = await supabase
+      .from('subjects')
+      .insert({ id, ...data })
+      .select()
+      .single()
+    if (!error && row) {
+      setSubjects((prev) => [...prev, { ...row, user_id: '' }])
+    }
+  }
+
   const handleSaveSubjectSettings = async (subjectId: string, patch: Partial<Subject>) => {
     const { user_id, ...dbPatch } = patch as any
     await supabase.from('subjects').update(dbPatch).eq('id', subjectId)
@@ -211,6 +225,10 @@ export default function Home() {
             onSwitch={setActiveUserId}
             onRename={handleRenameUser}
           />
+          <Button variant="outline" size="sm" onClick={() => setCreateSubjectOpen(true)} className="shrink-0">
+            <Plus className="h-4 w-4 mr-1.5" />
+            科目追加
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="shrink-0">
             <FileUp className="h-4 w-4 mr-1.5" />
             時間割インポート
@@ -305,6 +323,11 @@ export default function Home() {
         subject={editingSubject}
         onClose={() => setEditingSubject(null)}
         onSave={handleSaveSubjectSettings}
+      />
+      <SubjectCreateModal
+        open={createSubjectOpen}
+        onClose={() => setCreateSubjectOpen(false)}
+        onSave={handleCreateSubject}
       />
       <PdfImportModal
         open={importOpen}
