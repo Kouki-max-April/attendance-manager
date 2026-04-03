@@ -3,22 +3,18 @@ import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 
-// .env.local を読み込む
 const __dir = dirname(fileURLToPath(import.meta.url))
 const envPath = join(__dir, '../.env.local')
 const env = Object.fromEntries(
   readFileSync(envPath, 'utf-8')
     .split('\n')
     .filter(l => l && !l.startsWith('#'))
-    .map(l => l.split('=').map((p, i) => i === 0 ? p.trim() : l.slice(l.indexOf('=') + 1).trim()))
+    .map(l => [l.split('=')[0].trim(), l.slice(l.indexOf('=') + 1).trim()])
 )
 
-const supabase = createClient(
-  env.NEXT_PUBLIC_SUPABASE_URL,
-  env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
-// ── 科目一覧 ──────────────────────────────────────────────────────
+// ── 科目 ────────────────────────────────────────────────────────
 const subjects = [
   { id: 'ds',  name: '医療情報科学・データサイエンス3', requirement_type: 'TWO_THIRDS', count_tardiness_as: 0.5, ignore_excused: true, color: '#6366f1' },
   { id: 'ph',  name: '薬物・放射線と生体',             requirement_type: 'TWO_THIRDS', count_tardiness_as: 0.5, ignore_excused: true, color: '#ef4444' },
@@ -46,213 +42,194 @@ const subjects = [
   { id: 'ra',  name: '放射線',                         requirement_type: 'TWO_THIRDS', count_tardiness_as: 0.5, ignore_excused: true, color: '#475569' },
 ]
 
-// ── 時限 → 開始時刻 ──────────────────────────────────────────────
-const PERIOD_TIMES = [
-  { h: 8,  m: 40 },
-  { h: 10, m: 0  },
-  { h: 11, m: 20 },
-  { h: 13, m: 20 },
-  { h: 14, m: 40 },
-  { h: 16, m: 0  },
+// ── 時限 ─────────────────────────────────────────────────────────
+const PT = [
+  { h: 8,  m: 40 }, { h: 10, m: 0  }, { h: 11, m: 20 },
+  { h: 13, m: 20 }, { h: 14, m: 40 }, { h: 16, m: 0  },
+]
+const PE = [
+  { h: 9,  m: 50 }, { h: 11, m: 10 }, { h: 12, m: 30 },
+  { h: 14, m: 30 }, { h: 15, m: 50 }, { h: 17, m: 10 },
 ]
 
-const PERIOD_END_TIMES = [
-  { h: 9,  m: 50 },
-  { h: 11, m: 10 },
-  { h: 12, m: 30 },
-  { h: 14, m: 30 },
-  { h: 15, m: 50 },
-  { h: 17, m: 10 },
-]
+const toISO = (date, h, m) =>
+  `${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+09:00`
 
-function toISO(date, h, m) {
-  return `${date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+09:00`
-}
-
-// ── スケジュール ──────────────────────────────────────────────────
+// ── スケジュール [日付, 1限〜6限] ────────────────────────────────
 const N = null
 const SCHEDULE = [
+  // ══ Ⅰ学期 ══
   ['2026-04-10', N,    N,    'ds', 'ph', 'ph', N   ],
-  ['2026-04-13', N,    'pa', 'pa', 'en', 'en', N   ],
+  ['2026-04-13', 'pa', 'pa', 'pa', 'en', 'en', N   ],
   ['2026-04-14', N,    's1', 's1', 'bh', N,    N   ],
-  ['2026-04-15', 'pa', 'pa', 'pa', 's2', 's2', N   ],
-  ['2026-04-16', 's2', 's2', 's2', 'bh', 's1', N   ],
+  ['2026-04-15', N,    'pa', 'pa', 's2', 's2', N   ],
+  ['2026-04-16', N,    's2', 's2', 'bh', 's1', N   ],
   ['2026-04-17', N,    's1', 'ds', N,    N,    N   ],
-  ['2026-04-20', 'pa', 'pa', 'pa', 'en', 'en', N   ],
+  ['2026-04-20', N,    'pa', 'pa', 'en', 'en', N   ],
   ['2026-04-21', N,    's1', 's1', 'ph', 'ph', 'ph'],
-  ['2026-04-22', 'bh', 'bh', 'bh', 's2', 's2', N   ],
-  ['2026-04-23', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-04-24', 's1', 'pa', 'ds', 'ph', 'ph', 'ph'],
-  ['2026-04-27', 'pa', 's1', 'pa', 'en', 'en', N   ],
-  ['2026-04-28', 's1', 's2', 's1', 'ph', 'ph', N   ],
-  ['2026-04-30', 's2', 's1', 's2', 'ph', 'ph', N   ],
-  ['2026-05-01', N,    N,    'ds', 'ph', 'ph', N   ],
-  ['2026-05-07', 's2', 's2', 'pa', 'pa', 'ds', N   ],
-  ['2026-05-08', 's1', 's1', 's1', 'ph', 'ph', 'ph'],
+  ['2026-04-22', N,    'bh', 'bh', 's2', 's2', N   ],
+  ['2026-04-23', N,    's2', 's2', 's1', 's1', N   ],
+  ['2026-04-24', N,    's1', 'pa', 'ph', 'en', 'ph'],
+  ['2026-04-27', N,    'pa', 's1', 'ph', 'ph', N   ],
+  ['2026-04-28', N,    's1', 'ds', 'ph', N,    'ph'],
+  ['2026-04-30', N,    's2', 's2', 'ph', 'ph', 'ph'],
+  ['2026-05-01', N,    's1', 's1', 'pa', 'ph', N   ],
+  ['2026-05-07', N,    's2', 's2', 'ds', 'ph', N   ],
+  ['2026-05-08', N,    's1', 'ds', 'ph', N,    N   ],
   ['2026-05-11', N,    'ip', 'ip', 'en', 'en', N   ],
   ['2026-05-12', N,    'me', 'me', N,    N,    N   ],
   ['2026-05-13', N,    'pa', 'pa', 's2', 's2', 's2'],
   ['2026-05-14', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-05-15', 's1', 'pa', 'ds', 'ph', 'ph', 'ph'],
-  ['2026-05-18', 'pa', 'pa', 'pa', 'en', 'en', N   ],
-  ['2026-05-19', N,    's1', 's1', 'ph', 'ph', 'ph'],
-  ['2026-05-20', 'bh', 'bh', 'bh', 's2', 's2', N   ],
-  ['2026-05-21', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-05-22', 's1', 'pa', 'ds', 'ph', 'ph', 'ph'],
-  ['2026-05-25', 'pa', 's1', 'pa', 'en', 'en', N   ],
-  ['2026-05-26', 's1', 's2', 's1', 'ip', 'ip', N   ],
-  ['2026-05-27', N,    'me', 'me', 's2', 's2', N   ],
-  ['2026-05-28', 's2', 's1', 's2', 'ph', 'ph', N   ],
-  ['2026-05-29', N,    N,    'ds', 'ph', 'ph', N   ],
-  ['2026-06-01', 's2', 's2', 'pa', 'pa', 'sy', 'sy'],
-  ['2026-06-02', 's1', 's1', 's1', 'ph', 'ph', 'ph'],
-  ['2026-06-03', 'bh', 'bh', 'bh', 'sy', 'sy', N   ],
-  ['2026-06-04', 'sy', 'sy', 'sy', 's1', 's1', N   ],
-  ['2026-06-05', 's1', 'pa', 'ds', 'ph', 'ph', 'ph'],
-  ['2026-06-08', 'pa', 'pa', 'pa', 'en', 'en', N   ],
-  ['2026-06-09', N,    's1', 's1', 'in', 'in', 'in'],
-  ['2026-06-10', 'in', 'in', 'in', 's2', 's2', N   ],
-  ['2026-06-11', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-06-12', 's1', 'pa', 'ds', 'ph', 'ph', 'ph'],
-  ['2026-06-15', 'pa', 's1', 'pa', 'en', 'en', N   ],
-  ['2026-06-16', 's1', 's2', 's1', 'in', 'in', N   ],
-  ['2026-06-17', 'in', 'in', 'bh', 's2', 's2', N   ],
-  ['2026-06-18', 's2', 's1', 's2', 'ph', 'ph', N   ],
-  ['2026-06-19', N,    'cm', 'cm', 'ph', 'ph', N   ],
-  ['2026-06-22', 's2', 's2', 'pa', 'pa', 'cm', N   ],
-  ['2026-06-23', 's1', 's1', 's1', 'ph', 'ph', 'ph'],
-  ['2026-06-24', 'cm', 'cm', 'cm', 's2', 's2', N   ],
-  ['2026-06-25', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-06-26', 's1', 'pa', 'ds', 'pr', 'pr', 'pr'],
-  ['2026-06-29', 'pa', 'pa', 'pa', 'en', 'en', N   ],
-  ['2026-06-30', N,    's1', 's1', 'pr', 'pr', 'pr'],
-  ['2026-07-01', 'pr', 'pr', 'pr', 's2', 's2', N   ],
-  ['2026-07-02', 's2', 's2', 's2', 's1', 's1', N   ],
-  ['2026-07-03', 's1', 'pa', 'ds', 'pr', 'pr', 'pr'],
+  ['2026-05-15', 'ph', 'ph', 'ph', 'ph', 'ph', N   ],
+  ['2026-05-18', 'pa', 'ip', 'ip', 'en', 'en', N   ],
+  ['2026-05-19', N,    'me', 'me', N,    N,    N   ],
+  ['2026-05-20', 'pa', 'pa', 's2', 's2', 's2', 's1'],
+  ['2026-05-21', N,    's2', 's2', 's2', 's1', 's2'],
+  ['2026-05-22', 'ph', 'ph', 'ph', 'ph', 'ph', N   ],
+  ['2026-05-25', N,    'pa', 'pa', 'en', 'en', N   ],
+  ['2026-05-26', N,    N,    'me', N,    N,    N   ],
+  ['2026-05-27', N,    'sy', 'sy', 'ip', N,    N   ],
+  ['2026-05-28', 'sy', 'sy', 'sy', 'sy', 'sy', 's1'],
+  ['2026-05-29', N,    'in', 'in', 's2', 's2', N   ],
+  ['2026-06-01', 'sy', 'sy', 'sy', 'en', 'en', N   ],
+  ['2026-06-02', N,    'in', 'in', 's1', 's1', 's1'],
+  ['2026-06-03', 'sy', 'sy', 'sy', 'in', 'in', N   ],
+  ['2026-06-04', N,    'in', 'in', 'in', 'in', N   ],
+  ['2026-06-05', 'ph', 'ph', 'ph', 'ph', 'ph', N   ],
+  ['2026-06-08', 'sy', 'sy', 'sy', 's1', 's1', 's1'],
+  ['2026-06-09', N,    'cm', 'cm', 'in', 'in', 's1'],
+  ['2026-06-10', N,    'in', 'in', 's1', 's1', N   ],
+  ['2026-06-11', 'sy', 'cm', 'cm', 'cm', 'cm', 'sy'],
+  ['2026-06-12', 'ph', 'ph', 'ph', 'ph', 'ph', N   ],
+  ['2026-06-15', N,    'in', 'in', 's1', 's1', 's1'],
+  ['2026-06-16', 'sy', 'sy', 'sy', 'cm', 'cm', N   ],
+  ['2026-06-17', 's1', 'sy', 'sy', 'sy', 'sy', 'sy'],
+  ['2026-06-18', 'sy', 'sy', 'sy', 's1', 's1', 's1'],
+  ['2026-06-19', 'ph', 'ph', 'ph', 'ph', 'ph', N   ],
+  ['2026-06-22', 'pr', 'pr', 'pr', 'cm', 'cm', N   ],
+  ['2026-06-23', N,    'sy', 'sy', 's1', 's1', 's1'],
+  ['2026-06-24', N,    'in', 'in', 'sy', 'sy', 'sy'],
+  ['2026-06-25', 'sy', 'sy', 'sy', 'pr', 'pr', N   ],
+  ['2026-06-26', N,    N,    N,    'pr', 'pr', N   ],
+  ['2026-06-29', N,    'sy', 'sy', 'sy', 'sy', N   ],
+
   // ══ Ⅱ学期 ══
-  ['2026-08-31', N,    N,    'ca', 'ca', 'ca', N   ],
-  ['2026-09-01', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
-  ['2026-09-02', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
-  ['2026-09-03', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
-  ['2026-09-04', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
-  ['2026-09-07', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
-  ['2026-09-08', 'ne', 'ne', 're', 're', 're', N   ],
-  ['2026-09-09', 're', 're', 're', 'ca', 'ca', N   ],
-  ['2026-09-10', 'ca', 'ca', 'ca', 're', 're', N   ],
-  ['2026-09-11', 're', 're', 're', 'ne', 'ne', N   ],
-  ['2026-09-14', 'ne', 'ne', 'ne', 're', 're', N   ],
-  ['2026-09-15', 're', 're', 'gi', 'gi', 'gi', N   ],
-  ['2026-09-16', 'gi', 'gi', 'gi', 're', 're', N   ],
-  ['2026-09-17', 're', 're', 're', 'gi', 'gi', N   ],
-  ['2026-09-18', 'gi', 'gi', 'gi', 're', 're', N   ],
-  ['2026-09-24', 're', 're', 're', 'gi', 'gi', N   ],
-  ['2026-09-25', 'gi', 'gi', 'gi', 're', 're', N   ],
-  ['2026-09-28', 're', 're', 're', 'gi', 'gi', N   ],
-  ['2026-09-29', 'gi', 'gi', 'gi', 'ca', 'ca', N   ],
-  ['2026-09-30', 'ca', 'ca', 'ca', 'gi', 'gi', N   ],
-  ['2026-10-01', 'gi', 'gi', 'gi', 'ca', 'ca', N   ],
-  ['2026-10-02', 'ca', 'ca', 'ca', 'gi', 'gi', N   ],
-  ['2026-10-05', 'gi', 'gi', 'gi', 'ca', 'ca', N   ],
-  ['2026-10-06', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
-  ['2026-10-07', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
-  ['2026-10-08', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
-  ['2026-10-09', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-08-31', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-09-01', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-09-02', 're', 're', 're', 'gi', 'gi', 'gi'],
+  ['2026-09-03', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-09-04', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-09-07', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-09-08', 're', 're', 're', 'gi', 'gi', 'gi'],
+  ['2026-09-09', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-09-10', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-09-11', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-09-14', 're', 're', 're', 'gi', 'gi', 'gi'],
+  ['2026-09-15', 'gi', 'gi', 'gi', 're', 're', N   ],
+  ['2026-09-16', N,    'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-09-17', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-09-18', 're', 're', 're', 'gi', 'gi', N   ],
+  // 9/21(敬老の日) 9/22(国民の休日) 9/23(秋分の日) 休講
+  ['2026-09-24', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-09-25', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-09-28', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-09-29', 're', 're', 're', 'gi', 'gi', 'gi'],
+  ['2026-09-30', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-10-01', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-10-02', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-10-05', 're', 're', 're', 'gi', 'gi', 'gi'],
+  ['2026-10-06', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-10-07', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  ['2026-10-08', 'ne', 'ne', 'ne', 'ca', 'ca', N   ],
+  ['2026-10-09', 're', 're', 're', 'gi', 'gi', 'gi'],
+  // 10/12(スポーツの日) 休講
+  ['2026-10-13', 'gi', 'gi', 'gi', 're', 're', 're'],
+  ['2026-10-14', 'ca', 'ca', 'ca', 'ne', 'ne', N   ],
+  // 10/15-10/20 試験期間（休講）
+  // 10/21-12/22 科学的探究3（下で生成）
+
   // ══ Ⅲ学期 ══
-  ['2027-01-07', N,    N,    'kn', 'kn', 'kn', N   ],
-  ['2027-01-08', 'kn', 'kn', 'kn', 'ed', 'ed', N   ],
-  ['2027-01-12', 'ed', 'ed', 'ed', 'kn', 'kn', N   ],
-  ['2027-01-13', 'kn', 'kn', 'kn', 'ed', 'ed', N   ],
-  ['2027-01-14', 'ed', 'ed', 'ed', 'bl', 'bl', N   ],
-  ['2027-01-15', 'bl', 'bl', 'bl', 'ed', 'ed', N   ],
-  ['2027-01-18', 'ed', 'ed', 'ed', 'bl', 'bl', N   ],
-  ['2027-01-19', 'bl', 'bl', 'bl', 'al', 'al', N   ],
-  ['2027-01-20', 'al', 'al', 'al', 'bl', 'bl', N   ],
-  ['2027-01-21', 'bl', 'bl', 'bl', 'al', 'al', N   ],
-  ['2027-01-22', 'al', 'al', 'al', 'on', 'on', N   ],
-  ['2027-01-25', 'on', 'on', 'on', 'al', 'al', N   ],
-  ['2027-01-26', 'al', 'al', 'al', 'on', 'on', N   ],
-  ['2027-01-27', 'on', 'on', 'on', 'ra', 'ra', N   ],
-  ['2027-01-28', 'ra', 'ra', 'ra', 'on', 'on', N   ],
-  ['2027-01-29', 'on', 'on', 'on', 'ra', 'ra', N   ],
-  ['2027-02-01', 'ra', 'ra', 'ra', 'on', 'on', N   ],
-  ['2027-02-02', 'on', 'on', 'on', 'ra', 'ra', N   ],
-  ['2027-02-03', 'ra', 'ra', 'ra', 'kn', 'kn', N   ],
-  ['2027-02-04', 'kn', 'kn', 'kn', 'ed', 'ed', N   ],
-  ['2027-02-05', 'ed', 'ed', 'ed', 'kn', 'kn', N   ],
+  ['2027-01-05', N,    'kn', 'kn', 'ed', 'ed', N   ],
+  ['2027-01-08', 'al', 'al', 'al', 'bl', 'bl', N   ],
+  // 1/11(成人の日) 休講
+  ['2027-01-12', 'kn', 'kn', 'kn', 'ed', 'ed', N   ],
+  ['2027-01-13', 'bl', 'bl', 'bl', 'al', 'al', N   ],
+  ['2027-01-14', 'on', 'on', 'on', 'ra', 'ra', N   ],
+  ['2027-01-15', N,    'ed', 'ed', 'kn', 'kn', 'kn'],
+  ['2027-01-18', 'al', 'al', 'al', 'bl', 'bl', N   ],
+  ['2027-01-19', 'kn', 'kn', 'kn', 'ed', 'ed', N   ],
+  ['2027-01-20', 'bl', 'bl', 'bl', 'al', 'al', N   ],
+  ['2027-01-21', 'ra', 'ra', 'ra', 'on', 'on', 'on'],
+  ['2027-01-22', 'ed', 'ed', 'ed', 'kn', 'kn', 'kn'],
+  ['2027-01-25', 'al', 'al', 'al', 'bl', 'bl', 'ed'],
+  ['2027-01-26', 'kn', 'kn', 'kn', 'ed', 'ed', 'ed'],
+  ['2027-01-27', 'on', 'on', 'kn', 'kn', 'kn', 'kn'],
+  ['2027-01-28', 'ed', 'ed', 'ed', 'kn', 'kn', 'kn'],
 ]
 
-// 科学的探究3（金曜 3-4限、通年）
-function addResearchLessons(lessons) {
-  const start = new Date('2026-04-10')
-  const end   = new Date('2027-02-05')
+// ── 科学的探究3（10/21〜12/22、各日 1〜6限）────────────────────────
+function buildResearchLessons(lessons) {
   const holidays = new Set([
-    '2026-04-29','2026-05-03','2026-05-04','2026-05-05',
-    '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23',
-    '2026-10-12','2026-11-03','2026-11-23','2027-01-01',
+    '2026-10-29','2026-10-30','2026-10-31',
+    '2026-11-01','2026-11-02','2026-11-03', // 医獣祭 + 文化の日
+    '2026-11-23',                            // 勤労感謝の日
   ])
-  let d = new Date(start)
-  let idx = 0
+  let d = new Date('2026-10-21')
+  const end = new Date('2026-12-22')
   while (d <= end) {
-    if (d.getDay() === 5) {
-      const ds = d.toISOString().slice(0,10)
-      if (!holidays.has(ds)) {
-        ;[2,3].forEach((p) => {
-          lessons.push({
-            id: `rs_${ds}_${p}`,
-            subject_id: 'rs',
-            scheduled_at: toISO(ds, PERIOD_TIMES[p].h, PERIOD_TIMES[p].m),
-            end_at: toISO(ds, PERIOD_END_TIMES[p].h, PERIOD_END_TIMES[p].m),
-          })
+    const dow = d.getDay()
+    const ds = d.toISOString().slice(0, 10)
+    if (dow !== 0 && dow !== 6 && !holidays.has(ds)) {
+      for (let pi = 0; pi < 6; pi++) {
+        lessons.push({
+          id: `rs_${ds}_${pi + 1}`,
+          subject_id: 'rs',
+          scheduled_at: toISO(ds, PT[pi].h, PT[pi].m),
+          end_at:       toISO(ds, PE[pi].h, PE[pi].m),
         })
-        idx++
       }
     }
-    d.setDate(d.getDate()+1)
+    d.setDate(d.getDate() + 1)
   }
 }
 
-// レッスン生成
+// ── レッスン生成 ──────────────────────────────────────────────────
 function buildLessons() {
   const lessons = []
   for (const [date, ...periods] of SCHEDULE) {
-    periods.forEach((subjectId, pi) => {
-      if (!subjectId) return
+    periods.forEach((sid, pi) => {
+      if (!sid) return
       lessons.push({
-        id: `${subjectId}_${date}_${pi+1}`,
-        subject_id: subjectId,
-        scheduled_at: toISO(date, PERIOD_TIMES[pi].h, PERIOD_TIMES[pi].m),
-        end_at: toISO(date, PERIOD_END_TIMES[pi].h, PERIOD_END_TIMES[pi].m),
+        id: `${sid}_${date}_${pi + 1}`,
+        subject_id: sid,
+        scheduled_at: toISO(date, PT[pi].h, PT[pi].m),
+        end_at:       toISO(date, PE[pi].h, PE[pi].m),
       })
     })
   }
-  addResearchLessons(lessons)
+  buildResearchLessons(lessons)
   return lessons
 }
 
 // ── メイン ────────────────────────────────────────────────────────
 async function seed() {
-  console.log('🌱 シード開始...')
+  console.log('🗑  既存データをクリア...')
+  await supabase.from('attendance_records').delete().neq('id', '')
+  await supabase.from('lessons').delete().neq('id', '')
+  await supabase.from('subjects').delete().neq('id', '')
 
-  // subjects
-  console.log(`  科目 ${subjects.length}件 を挿入...`)
-  const { error: subErr } = await supabase
-    .from('subjects')
-    .upsert(subjects, { onConflict: 'id' })
-  if (subErr) { console.error('subjects error:', subErr); process.exit(1) }
+  console.log(`📚 科目 ${subjects.length}件 を挿入...`)
+  const { error: subErr } = await supabase.from('subjects').insert(subjects)
+  if (subErr) { console.error(subErr); process.exit(1) }
 
-  // lessons
   const lessons = buildLessons()
-  console.log(`  授業 ${lessons.length}件 を挿入...`)
-  // 100件ずつバッチ挿入
+  console.log(`📅 授業 ${lessons.length}件 を挿入...`)
   for (let i = 0; i < lessons.length; i += 100) {
-    const batch = lessons.slice(i, i + 100)
-    const { error } = await supabase
-      .from('lessons')
-      .upsert(batch, { onConflict: 'id' })
-    if (error) { console.error('lessons error:', error); process.exit(1) }
-    process.stdout.write(`\r  授業 ${Math.min(i+100, lessons.length)}/${lessons.length} 件完了`)
+    const { error } = await supabase.from('lessons').insert(lessons.slice(i, i + 100))
+    if (error) { console.error(error); process.exit(1) }
+    process.stdout.write(`\r   ${Math.min(i + 100, lessons.length)}/${lessons.length}`)
   }
-  console.log('\n✅ シード完了!')
+  console.log('\n✅ 完了!')
 }
 
 seed()
