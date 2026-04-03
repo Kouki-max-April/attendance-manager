@@ -26,8 +26,11 @@ interface Props {
 type Mode = 'edit' | 'makeup'
 
 export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, onAddMakeup }: Props) {
+  const [open, setOpen] = useState(true)
   const [mode, setMode] = useState<Mode>('edit')
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const close = () => { setOpen(false); onClose() }
 
   // edit フォーム
   const [date, setDate] = useState(
@@ -56,14 +59,13 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
   const handleSave = () => {
     try {
       const p = PERIODS[Number(period) - 1]
-      if (!p) { onClose(); return }
-      // iOS Safari returns YYYY/MM/DD — normalize to YYYY-MM-DD
+      if (!p) return
       const normalized = date.replace(/\//g, '-')
       const [y, m, d] = normalized.split('-').map(Number)
-      if (!y || !m || !d) { onClose(); return }
+      if (!y || !m || !d) return
       const start = new Date(y, m - 1, d, p.startHour, p.startMin)
       const end   = new Date(y, m - 1, d, p.endHour,   p.endMin)
-      if (isNaN(start.getTime())) { onClose(); return }
+      if (isNaN(start.getTime())) return
       onSave(lesson.id, {
         scheduled_at: start.toISOString(),
         end_at: end.toISOString(),
@@ -74,7 +76,7 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
     } catch (e) {
       console.error('handleSave error:', e)
     } finally {
-      onClose()
+      close()
     }
   }
 
@@ -92,7 +94,7 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
       location: makeupLocation || undefined,
       notes: '補講',
     })
-    onClose()
+    close()
   }
 
   const handleDelete = () => {
@@ -101,13 +103,13 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
       return
     }
     onDelete(lesson.id)
-    onClose()
+    close()
   }
 
   const subjectName = subjects.find((s) => s.id === lesson.subject_id)?.name ?? '不明'
 
   return (
-    <Dialog open={!!lesson} onOpenChange={onClose}>
+    <Dialog open={open && !!lesson} onOpenChange={(o) => { if (!o) close() }}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{subjectName} — 授業の変更</DialogTitle>
@@ -250,7 +252,7 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>キャンセル</Button>
+          <Button variant="outline" onClick={close}>キャンセル</Button>
           {mode === 'edit' && (
             <Button onClick={handleSave}>変更を保存</Button>
           )}
