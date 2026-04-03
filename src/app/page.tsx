@@ -320,6 +320,7 @@ export default function Home() {
         onEditLesson={(lesson) => setEditingLesson(lesson)}
       />
       <LessonEditModal
+        key={editingLesson?.id ?? 'none'}
         lesson={editingLesson}
         subjects={subjects}
         onClose={() => setEditingLesson(null)}
