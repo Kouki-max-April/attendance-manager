@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { LayoutDashboard, CalendarDays, FileUp, BarChart2, Plus } from 'lucide-react'
 import { StatsTab } from '@/components/stats/StatsTab'
 import { SubjectCreateModal } from '@/components/dashboard/SubjectCreateModal'
+import { LessonAddModal } from '@/components/calendar/LessonAddModal'
 import { PushToggle } from '@/components/PushToggle'
 
 const INITIAL_USERS: AppUser[] = [
@@ -41,6 +42,7 @@ export default function Home() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false)
+  const [addLessonDate, setAddLessonDate] = useState<Date | null>(null)
 
   // ── 初期データ読み込み ────────────────────────────────────────
   useEffect(() => {
@@ -288,6 +290,7 @@ export default function Home() {
               subjects={subjects}
               subjectStatusMap={activeSubjectStatusMap}
               onLessonClick={setSelectedLesson}
+            onDayClick={setAddLessonDate}
             />
           </TabsContent>
 
@@ -328,6 +331,12 @@ export default function Home() {
         open={createSubjectOpen}
         onClose={() => setCreateSubjectOpen(false)}
         onSave={handleCreateSubject}
+      />
+      <LessonAddModal
+        date={addLessonDate}
+        subjects={subjects}
+        onClose={() => setAddLessonDate(null)}
+        onAdd={handleAddMakeup}
       />
       <PdfImportModal
         open={importOpen}

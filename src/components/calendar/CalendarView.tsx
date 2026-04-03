@@ -7,7 +7,7 @@ import {
 } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import type { Lesson, AttendanceRecord, Subject, SubjectStatus } from '@/lib/types'
 import { getPeriodFromTime } from '@/lib/periods'
 
@@ -42,9 +42,10 @@ interface Props {
   subjects: Subject[]
   subjectStatusMap: Record<string, SubjectStatus>
   onLessonClick: (lesson: Lesson) => void
+  onDayClick: (date: Date) => void
 }
 
-export function CalendarView({ lessons, records, subjects, subjectStatusMap, onLessonClick }: Props) {
+export function CalendarView({ lessons, records, subjects, subjectStatusMap, onLessonClick, onDayClick }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   const monthStart = startOfMonth(currentMonth)
@@ -105,11 +106,21 @@ export function CalendarView({ lessons, records, subjects, subjectStatusMap, onL
               key={day.toISOString()}
               className={`min-h-[96px] border-r border-b p-1 ${!isCurrentMonth ? 'bg-gray-50' : ''}`}
             >
-              <div className={`text-xs w-6 h-6 flex items-center justify-center rounded-full mb-1 font-medium
-                ${isToday ? 'bg-primary text-primary-foreground' : ''}
-                ${!isCurrentMonth ? 'text-muted-foreground' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : ''}
-              `}>
-                {format(day, 'd')}
+              <div className="flex items-center justify-between mb-1">
+                <div className={`text-xs w-6 h-6 flex items-center justify-center rounded-full font-medium
+                  ${isToday ? 'bg-primary text-primary-foreground' : ''}
+                  ${!isCurrentMonth ? 'text-muted-foreground' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : ''}
+                `}>
+                  {format(day, 'd')}
+                </div>
+                {isCurrentMonth && (
+                  <button
+                    onClick={() => onDayClick(day)}
+                    className="w-4 h-4 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                )}
               </div>
 
               <div className="space-y-0.5">
@@ -117,8 +128,7 @@ export function CalendarView({ lessons, records, subjects, subjectStatusMap, onL
                   const record = recordMap[lesson.id]
                   const statusKey = record?.status ?? 'UNRECORDED'
                   const subject = subjectMap[lesson.subject_id]
-                  const subjectColor = subject?.color ?? '#94a3b8'
-                  const textColor = statusTextColor[subjectStatusMap[lesson.subject_id] ?? 'SAFE']
+                  const textColor = subject?.color ?? '#94a3b8'
                   const period = getPeriodFromTime(lesson.scheduled_at)
 
                   return (

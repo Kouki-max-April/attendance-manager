@@ -22,6 +22,12 @@ interface Props {
   onSave: (subjectId: string, patch: Partial<Subject>) => void
 }
 
+const PRESET_COLORS = [
+  '#3b82f6','#ef4444','#f97316','#84cc16','#14b8a6',
+  '#a855f7','#ec4899','#f59e0b','#0891b2','#65a30d',
+  '#7c3aed','#e11d48','#1d4ed8','#0f766e','#b91c1c','#64748b',
+]
+
 export function SubjectSettingsModal({ subject, onClose, onSave }: Props) {
   const [requirementType, setRequirementType] = useState<RequirementType>(
     subject?.requirement_type ?? 'TWO_THIRDS'
@@ -31,6 +37,7 @@ export function SubjectSettingsModal({ subject, onClose, onSave }: Props) {
       ? Math.round(subject.custom_threshold * 100)
       : 80
   )
+  const [color, setColor] = useState(subject?.color ?? '#94a3b8')
 
   if (!subject) return null
 
@@ -38,6 +45,7 @@ export function SubjectSettingsModal({ subject, onClose, onSave }: Props) {
     onSave(subject.id, {
       requirement_type: requirementType,
       custom_threshold: requirementType === 'CUSTOM' ? customThreshold / 100 : undefined,
+      color,
     })
     onClose()
   }
@@ -46,10 +54,27 @@ export function SubjectSettingsModal({ subject, onClose, onSave }: Props) {
     <Dialog open={!!subject} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{subject.name} — 出席要件の設定</DialogTitle>
+          <DialogTitle>{subject.name} — 設定</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 py-2">
+        <div className="space-y-4 py-2">
+          {/* カラー */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">カレンダー表示色</Label>
+            <div className="flex flex-wrap gap-2">
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className={`w-6 h-6 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : ''}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+          </div>
+          {/* 必要出席率 */}
+          <div className="space-y-2">
           <Label className="text-sm font-medium">必要出席率</Label>
           <div className="space-y-2">
             {REQUIREMENT_OPTIONS.map((opt) => (
@@ -86,6 +111,7 @@ export function SubjectSettingsModal({ subject, onClose, onSave }: Props) {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         <DialogFooter>

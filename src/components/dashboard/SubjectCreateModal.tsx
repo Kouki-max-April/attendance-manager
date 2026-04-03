@@ -28,7 +28,6 @@ interface Props {
 
 export function SubjectCreateModal({ open, onClose, onSave }: Props) {
   const [name, setName] = useState('')
-  const [color, setColor] = useState('#3b82f6')
   const [requirementType, setRequirementType] = useState<RequirementType>('TWO_THIRDS')
   const [customThreshold, setCustomThreshold] = useState(80)
 
@@ -36,7 +35,7 @@ export function SubjectCreateModal({ open, onClose, onSave }: Props) {
     if (!name.trim()) return
     onSave({
       name: name.trim(),
-      color,
+      color: '#94a3b8',
       requirement_type: requirementType,
       custom_threshold: requirementType === 'CUSTOM' ? customThreshold / 100 : undefined,
       count_tardiness_as: 0.5,
@@ -44,7 +43,6 @@ export function SubjectCreateModal({ open, onClose, onSave }: Props) {
     })
     // リセット
     setName('')
-    setColor('#3b82f6')
     setRequirementType('TWO_THIRDS')
     setCustomThreshold(80)
     onClose()
@@ -67,22 +65,6 @@ export function SubjectCreateModal({ open, onClose, onSave }: Props) {
               placeholder="例: 解剖学"
               autoFocus
             />
-          </div>
-
-          {/* カラー */}
-          <div className="space-y-1.5">
-            <Label>カラー</Label>
-            <div className="flex flex-wrap gap-2">
-              {PRESET_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-6 h-6 rounded-full transition-transform ${color === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : ''}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
           </div>
 
           {/* 必要出席率 */}
