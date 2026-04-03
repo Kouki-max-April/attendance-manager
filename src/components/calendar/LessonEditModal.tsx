@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -26,9 +26,12 @@ interface Props {
 type Mode = 'edit' | 'makeup'
 
 export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, onAddMakeup }: Props) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!!lesson)
   const [mode, setMode] = useState<Mode>('edit')
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // lesson が変わったとき（再オープン）に open をリセット
+  useEffect(() => { if (lesson) setOpen(true) }, [lesson?.id])
 
   const close = () => { setOpen(false); onClose() }
 

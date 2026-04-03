@@ -152,14 +152,14 @@ export default function Home() {
   }
 
   const handleSaveLesson = async (lessonId: string, patch: Partial<Lesson>) => {
+    // 楽観的更新：DB結果を待たずにUIに反映
+    setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, ...patch } : l))
     const { user_id, subject, attendance_record, ...dbPatch } = patch as any
-    // undefined values cause Supabase to behave unexpectedly; use null to clear fields
     const cleanPatch = Object.fromEntries(
-      Object.entries(dbPatch).map(([k, v]) => [k, v === undefined ? null : v])
+      Object.entries(dbPatch).filter(([, v]) => v !== undefined)
     )
     const { error } = await supabase.from('lessons').update(cleanPatch).eq('id', lessonId)
-    if (error) { console.error('lesson update error:', error); return }
-    setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, ...patch } : l))
+    if (error) console.error('lesson update error:', error)
   }
 
   const handleDeleteLesson = async (lessonId: string) => {
