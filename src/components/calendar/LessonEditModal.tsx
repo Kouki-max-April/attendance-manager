@@ -54,18 +54,28 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
   if (!lesson) return null
 
   const handleSave = () => {
-    const p = PERIODS[Number(period) - 1]
-    const [y, m, d] = date.split('-').map(Number)
-    const start = new Date(y, m - 1, d, p.startHour, p.startMin)
-    const end   = new Date(y, m - 1, d, p.endHour,   p.endMin)
-    onSave(lesson.id, {
-      scheduled_at: start.toISOString(),
-      end_at: end.toISOString(),
-      location: location || undefined,
-      notes: notes || undefined,
-      display_color: displayColor || undefined,
-    })
-    onClose()
+    try {
+      const p = PERIODS[Number(period) - 1]
+      if (!p) { onClose(); return }
+      // iOS Safari returns YYYY/MM/DD — normalize to YYYY-MM-DD
+      const normalized = date.replace(/\//g, '-')
+      const [y, m, d] = normalized.split('-').map(Number)
+      if (!y || !m || !d) { onClose(); return }
+      const start = new Date(y, m - 1, d, p.startHour, p.startMin)
+      const end   = new Date(y, m - 1, d, p.endHour,   p.endMin)
+      if (isNaN(start.getTime())) { onClose(); return }
+      onSave(lesson.id, {
+        scheduled_at: start.toISOString(),
+        end_at: end.toISOString(),
+        location: location || null,
+        notes: notes || null,
+        display_color: displayColor || null,
+      })
+    } catch (e) {
+      console.error('handleSave error:', e)
+    } finally {
+      onClose()
+    }
   }
 
   const handleAddMakeup = () => {

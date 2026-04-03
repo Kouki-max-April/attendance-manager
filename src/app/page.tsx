@@ -153,7 +153,12 @@ export default function Home() {
 
   const handleSaveLesson = async (lessonId: string, patch: Partial<Lesson>) => {
     const { user_id, subject, attendance_record, ...dbPatch } = patch as any
-    await supabase.from('lessons').update(dbPatch).eq('id', lessonId)
+    // undefined values cause Supabase to behave unexpectedly; use null to clear fields
+    const cleanPatch = Object.fromEntries(
+      Object.entries(dbPatch).map(([k, v]) => [k, v === undefined ? null : v])
+    )
+    const { error } = await supabase.from('lessons').update(cleanPatch).eq('id', lessonId)
+    if (error) { console.error('lesson update error:', error); return }
     setLessons((prev) => prev.map((l) => l.id === lessonId ? { ...l, ...patch } : l))
   }
 
