@@ -128,7 +128,7 @@ export function CalendarView({ lessons, records, subjects, subjectStatusMap, onL
                   const record = recordMap[lesson.id]
                   const statusKey = record?.status ?? 'UNRECORDED'
                   const subject = subjectMap[lesson.subject_id]
-                  const textColor = subject?.color ?? '#94a3b8'
+                  const textColor = lesson.display_color ?? statusTextColor[subjectStatusMap[lesson.subject_id] ?? 'SAFE']
                   const period = getPeriodFromTime(lesson.scheduled_at)
 
                   return (

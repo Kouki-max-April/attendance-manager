@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Trash2 } from 'lucide-react'
+import { Trash2, X } from 'lucide-react'
 import type { Lesson, Subject } from '@/lib/types'
 import { PERIODS } from '@/lib/periods'
 
@@ -43,6 +43,7 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
   })
   const [location, setLocation] = useState(lesson?.location ?? '')
   const [notes, setNotes] = useState(lesson?.notes ?? '')
+  const [displayColor, setDisplayColor] = useState(lesson?.display_color ?? '')
 
   // 補講フォーム
   const [makeupDate, setMakeupDate] = useState('')
@@ -62,6 +63,7 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
       end_at: end.toISOString(),
       location: location || undefined,
       notes: notes || undefined,
+      display_color: displayColor || undefined,
     })
     onClose()
   }
@@ -151,6 +153,31 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>表示色（任意）</Label>
+              <div className="flex flex-wrap gap-2 items-center">
+                {['#16a34a','#ca8a04','#dc2626','#3b82f6','#a855f7','#ec4899','#f97316','#0891b2','#64748b'].map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setDisplayColor(displayColor === c ? '' : c)}
+                    className={`w-5 h-5 rounded-full transition-transform ${displayColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-110' : ''}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+                {displayColor && (
+                  <button
+                    type="button"
+                    onClick={() => setDisplayColor('')}
+                    className="text-xs text-muted-foreground flex items-center gap-0.5 hover:text-foreground"
+                  >
+                    <X className="w-3 h-3" />リセット
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">設定しない場合はステータス色（安全=緑・注意=黄・危険=赤）</p>
             </div>
 
             <Separator />

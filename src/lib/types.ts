@@ -24,6 +24,7 @@ export interface Lesson {
   location?: string
   notes?: string
   recurrence_group_id?: string
+  display_color?: string
   created_at: string
   updated_at: string
   subject?: Subject
