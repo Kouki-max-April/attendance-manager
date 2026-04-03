@@ -69,9 +69,9 @@ export function LessonEditModal({ lesson, subjects, onClose, onSave, onDelete, o
       onSave(lesson.id, {
         scheduled_at: start.toISOString(),
         end_at: end.toISOString(),
-        location: location || null,
-        notes: notes || null,
-        display_color: displayColor || null,
+        location: location || undefined,
+        notes: notes || undefined,
+        display_color: displayColor || undefined,
       })
     } catch (e) {
       console.error('handleSave error:', e)
