@@ -1,4 +1,4 @@
--- ログイン不要版スキーマ
+-- 1人用スキーマ
 -- 既存テーブルを削除して作り直す
 
 drop table if exists attendance_records cascade;
@@ -31,10 +31,8 @@ create table lessons (
 );
 
 -- attendance_records（出席記録）
--- user_key は 'u1' / 'u2' など任意の文字列
 create table attendance_records (
   id text primary key,
-  user_key text not null,
   lesson_id text not null references lessons(id) on delete cascade,
   subject_id text not null references subjects(id) on delete cascade,
   status text not null,
@@ -42,14 +40,13 @@ create table attendance_records (
   recorded_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique(lesson_id, user_key)
+  unique(lesson_id)
 );
 
 -- インデックス
 create index lessons_subject_id_idx on lessons(subject_id);
 create index lessons_scheduled_at_idx on lessons(scheduled_at);
 create index attendance_records_lesson_id_idx on attendance_records(lesson_id);
-create index attendance_records_user_key_idx on attendance_records(user_key);
 
 -- RLS は無効（認証不要）
 alter table subjects disable row level security;
