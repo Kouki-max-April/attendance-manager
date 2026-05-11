@@ -9,8 +9,10 @@ import { AttendanceModal } from '@/components/attendance/AttendanceModal'
 import { SubjectSettingsModal } from '@/components/dashboard/SubjectSettingsModal'
 import { LessonEditModal } from '@/components/calendar/LessonEditModal'
 import { PdfImportModal } from '@/components/import/PdfImportModal'
+import { CsvImportModal } from '@/components/import/CsvImportModal'
 import { calcSubjectStats } from '@/lib/attendance'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { mockSubjects, mockLessons } from '@/lib/mock-data'
 import type { Lesson, AttendanceStatus, AttendanceRecord, Subject } from '@/lib/types'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,7 @@ export default function Home() {
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null)
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
   const [createSubjectOpen, setCreateSubjectOpen] = useState(false)
   const [addLessonDate, setAddLessonDate] = useState<Date | null>(null)
 
@@ -43,6 +46,23 @@ export default function Home() {
         supabase.from('lessons').select('*').order('scheduled_at'),
         supabase.from('attendance_records').select('*'),
       ])
+
+      // データが空なら mock-data でデフォルトシード
+      if (!subData || subData.length === 0) {
+        const subRows = mockSubjects.map(({ user_id, created_at, updated_at, ...rest }) => rest)
+        await supabase.from('subjects').insert(subRows)
+
+        const lesRows = mockLessons.map(({ user_id, subject, attendance_record, created_at, updated_at, ...rest }) => rest)
+        for (let i = 0; i < lesRows.length; i += 200) {
+          await supabase.from('lessons').insert(lesRows.slice(i, i + 200))
+        }
+
+        setSubjects(mockSubjects)
+        setLessons(mockLessons)
+        setRecords([])
+        setLoading(false)
+        return
+      }
 
       if (subData) setSubjects(subData.map((s) => ({ ...s, user_id: '' })))
       if (lesData) setLessons(lesData.map((l) => ({ ...l, user_id: '' })))
@@ -184,7 +204,11 @@ export default function Home() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="shrink-0">
             <FileUp className="h-4 w-4 mr-1.5" />
-            時間割インポート
+            PDF取込
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCsvImportOpen(true)} className="shrink-0">
+            <FileUp className="h-4 w-4 mr-1.5" />
+            CSV取込
           </Button>
           <PushToggle />
         </div>
@@ -288,6 +312,12 @@ export default function Home() {
         open={importOpen}
         subjects={subjects}
         onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+      />
+      <CsvImportModal
+        open={csvImportOpen}
+        subjects={subjects}
+        onClose={() => setCsvImportOpen(false)}
         onImport={handleImport}
       />
     </main>
