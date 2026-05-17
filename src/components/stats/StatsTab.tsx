@@ -1,15 +1,17 @@
 'use client'
 
 import { useMemo } from 'react'
-import { format, isSameMonth } from 'date-fns'
+import { format, startOfMonth, isSameMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
-import type { Lesson, AttendanceRecord, Subject } from '@/lib/types'
+import type { Lesson, AttendanceRecord, Subject, AppUser } from '@/lib/types'
 import { calcSubjectStats } from '@/lib/attendance'
 
+// ── 色 ──────────────────────────────────────────────────────────────
+const USER_COLORS = ['#3b82f6', '#ec4899']
 const STATUS_PIE_COLORS = {
   PRESENT:    '#22c55e',
   ABSENT:     '#ef4444',
@@ -21,16 +23,24 @@ const DOW_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 const PERIOD_LABELS = ['1限', '2限', '3限', '4限', '5限', '6限']
 
 interface Props {
+  users: AppUser[]
+  activeUserId: string
   subjects: Subject[]
   lessons: Lesson[]
-  records: AttendanceRecord[]
+  allRecords: Record<string, AttendanceRecord[]>
 }
 
-function buildMonthlyData(lessons: Lesson[], records: AttendanceRecord[]) {
+// 月ごとに出席率を集計 (ユーザーごと)
+function buildMonthlyData(
+  users: AppUser[],
+  lessons: Lesson[],
+  allRecords: Record<string, AttendanceRecord[]>
+) {
   const now = new Date()
   const pastLessons = lessons.filter((l) => new Date(l.scheduled_at) <= now)
   if (pastLessons.length === 0) return []
 
+  // ユニークな月を列挙
   const monthSet = new Set(pastLessons.map((l) => format(new Date(l.scheduled_at), 'yyyy-MM')))
   const months = Array.from(monthSet).sort()
 
@@ -38,15 +48,22 @@ function buildMonthlyData(lessons: Lesson[], records: AttendanceRecord[]) {
     const [y, m] = ym.split('-').map(Number)
     const monthDate = new Date(y, m - 1, 1)
     const monthLessons = pastLessons.filter((l) => isSameMonth(new Date(l.scheduled_at), monthDate))
-    const monthRecords = records.filter((r) => monthLessons.some((l) => l.id === r.lesson_id))
-    const presentCount = monthRecords.filter((r) => r.status === 'PRESENT' || r.status === 'EXCUSED').length
-    return {
+    const entry: Record<string, string | number> = {
       month: format(monthDate, 'M月', { locale: ja }),
-      出席率: monthLessons.length > 0 ? Math.round((presentCount / monthLessons.length) * 100) : 0,
     }
+    users.forEach((user) => {
+      const records = allRecords[user.id] ?? []
+      const monthRecords = records.filter((r) =>
+        monthLessons.some((l) => l.id === r.lesson_id)
+      )
+      const presentCount = monthRecords.filter((r) => r.status === 'PRESENT' || r.status === 'EXCUSED').length
+      entry[user.name] = monthLessons.length > 0 ? Math.round((presentCount / monthLessons.length) * 100) : 0
+    })
+    return entry
   })
 }
 
+// 出席状況の内訳 (パイチャート用)
 function buildPieData(lessons: Lesson[], records: AttendanceRecord[]) {
   const now = new Date()
   const pastLessons = lessons.filter((l) => new Date(l.scheduled_at) <= now)
@@ -65,15 +82,20 @@ function buildPieData(lessons: Lesson[], records: AttendanceRecord[]) {
   ].filter((d) => d.value > 0)
 }
 
+// 曜日×時限ヒートマップ (欠席数)
 function buildHeatmap(lessons: Lesson[], records: AttendanceRecord[]) {
   const recordMap = Object.fromEntries(records.map((r) => [r.lesson_id, r]))
+  // [dow][period-1] = absent count
   const grid: number[][] = Array.from({ length: 7 }, () => Array(6).fill(0))
   lessons.forEach((l) => {
     const rec = recordMap[l.id]
     if (rec?.status === 'ABSENT' || rec?.status === 'TARDINESS') {
       const d = new Date(l.scheduled_at)
       const dow = d.getDay()
-      const totalMin = d.getHours() * 60 + d.getMinutes()
+      const hour = d.getHours()
+      const min = d.getMinutes()
+      const totalMin = hour * 60 + min
+      // period boundaries (minutes from midnight)
       const bounds = [520, 600, 680, 800, 880, 960, 1030]
       const p = bounds.findIndex((b, i) => totalMin >= b && (i === bounds.length - 1 || totalMin < bounds[i + 1]))
       if (p >= 0 && p < 6) grid[dow][p]++
@@ -82,6 +104,7 @@ function buildHeatmap(lessons: Lesson[], records: AttendanceRecord[]) {
   return grid
 }
 
+// 科目別出席率テーブル
 function SubjectTable({ subjects, lessons, records }: { subjects: Subject[]; lessons: Lesson[]; records: AttendanceRecord[] }) {
   const rows = subjects.map((s) => calcSubjectStats(s, lessons, records))
 
@@ -102,7 +125,9 @@ function SubjectTable({ subjects, lessons, records }: { subjects: Subject[]; les
             <tr key={subject.id} className="border-b hover:bg-muted/30 transition-colors">
               <td className="py-1.5 pr-3 font-medium truncate max-w-[160px]">{subject.name}</td>
               <td className="text-right py-1.5 px-2 text-muted-foreground">{attended_count}/{past_lessons}({total_lessons})</td>
-              <td className="text-right py-1.5 px-2 font-bold">
+              <td className="text-right py-1.5 px-2 font-bold
+                {status === 'DANGER' ? 'text-red-600' : status === 'WARNING' ? 'text-yellow-600' : 'text-green-700'}
+              ">
                 <span className={status === 'DANGER' ? 'text-red-600' : status === 'WARNING' ? 'text-yellow-600' : 'text-green-700'}>
                   {attendance_rate}%
                 </span>
@@ -127,10 +152,13 @@ function SubjectTable({ subjects, lessons, records }: { subjects: Subject[]; les
   )
 }
 
-export function StatsTab({ subjects, lessons, records }: Props) {
-  const monthlyData = useMemo(() => buildMonthlyData(lessons, records), [lessons, records])
-  const pieData = useMemo(() => buildPieData(lessons, records), [lessons, records])
-  const heatmap = useMemo(() => buildHeatmap(lessons, records), [lessons, records])
+export function StatsTab({ users, activeUserId, subjects, lessons, allRecords }: Props) {
+  const activeRecords = allRecords[activeUserId] ?? []
+  const activeUser = users.find((u) => u.id === activeUserId)!
+
+  const monthlyData = useMemo(() => buildMonthlyData(users, lessons, allRecords), [users, lessons, allRecords])
+  const pieData = useMemo(() => buildPieData(lessons, activeRecords), [lessons, activeRecords])
+  const heatmap = useMemo(() => buildHeatmap(lessons, activeRecords), [lessons, activeRecords])
 
   const maxHeat = Math.max(1, ...heatmap.flat())
 
@@ -149,7 +177,10 @@ export function StatsTab({ subjects, lessons, records }: Props) {
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
               <Tooltip formatter={(v) => `${v}%`} />
-              <Bar dataKey="出席率" fill="#3b82f6" radius={[3, 3, 0, 0]} maxBarSize={32} />
+              <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+              {users.map((u, i) => (
+                <Bar key={u.id} dataKey={u.name} fill={u.color ?? USER_COLORS[i]} radius={[3, 3, 0, 0]} maxBarSize={32} />
+              ))}
             </BarChart>
           </ResponsiveContainer>
         )}
@@ -160,7 +191,10 @@ export function StatsTab({ subjects, lessons, records }: Props) {
 
         {/* パイチャート */}
         <section>
-          <h3 className="text-sm font-semibold mb-3">出席状況内訳</h3>
+          <h3 className="text-sm font-semibold mb-3">
+            出席状況内訳
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">({activeUser.name})</span>
+          </h3>
           {pieData.length === 0 ? (
             <p className="text-sm text-muted-foreground">記録なし</p>
           ) : (
@@ -187,7 +221,10 @@ export function StatsTab({ subjects, lessons, records }: Props) {
 
         {/* 欠席ヒートマップ */}
         <section>
-          <h3 className="text-sm font-semibold mb-3">欠席・遅刻ヒートマップ</h3>
+          <h3 className="text-sm font-semibold mb-3">
+            欠席・遅刻ヒートマップ
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">({activeUser.name})</span>
+          </h3>
           <div className="overflow-x-auto">
             <table className="text-[10px] border-collapse">
               <thead>
@@ -205,10 +242,13 @@ export function StatsTab({ subjects, lessons, records }: Props) {
                     {heatmap.map((row, dow) => {
                       const val = row[pi]
                       const intensity = val / maxHeat
+                      const bg = val === 0
+                        ? 'bg-muted/30'
+                        : ''
                       return (
                         <td
                           key={dow}
-                          className={`w-7 h-7 text-center rounded transition-colors ${val === 0 ? 'bg-muted/30' : ''}`}
+                          className={`w-7 h-7 text-center rounded ${bg} transition-colors`}
                           style={val > 0 ? { backgroundColor: `rgba(239,68,68,${0.15 + intensity * 0.75})` } : undefined}
                           title={`${DOW_LABELS[dow]}曜 ${p}: ${val}回`}
                         >
@@ -226,8 +266,11 @@ export function StatsTab({ subjects, lessons, records }: Props) {
 
       {/* 科目別テーブル */}
       <section>
-        <h3 className="text-sm font-semibold mb-3">科目別詳細</h3>
-        <SubjectTable subjects={subjects} lessons={lessons} records={records} />
+        <h3 className="text-sm font-semibold mb-3">
+          科目別詳細
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">({activeUser.name})</span>
+        </h3>
+        <SubjectTable subjects={subjects} lessons={lessons} records={activeRecords} />
       </section>
     </div>
   )
