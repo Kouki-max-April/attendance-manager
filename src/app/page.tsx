@@ -47,11 +47,10 @@ export default function Home() {
   // ── 初期データ読み込み ────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      const [{ data: subData }, { data: lesData }, { data: recData }, { data: usrData }] = await Promise.all([
+      const [{ data: subData }, { data: lesData }, { data: recData }] = await Promise.all([
         supabase.from('subjects').select('*').order('id'),
         supabase.from('lessons').select('*').order('scheduled_at'),
         supabase.from('attendance_records').select('*'),
-        supabase.from('users').select('*'),
       ])
 
       if (subData) {
@@ -64,9 +63,6 @@ export default function Home() {
         const u1 = recData.filter((r) => r.user_key === 'u1').map(toRecord)
         const u2 = recData.filter((r) => r.user_key === 'u2').map(toRecord)
         setAllRecords({ u1, u2 })
-      }
-      if (usrData && usrData.length > 0) {
-        setUsers(usrData)
       }
       setLoading(false)
     }
@@ -211,10 +207,8 @@ export default function Home() {
     setSubjects((prev) => prev.map((s) => s.id === subjectId ? { ...s, ...patch } : s))
   }
 
-  const handleRenameUser = async (userId: string, name: string) => {
+  const handleRenameUser = (userId: string, name: string) =>
     setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, name } : u))
-    await supabase.from('users').update({ name }).eq('id', userId)
-  }
 
   // ── ローディング ──────────────────────────────────────────────
   if (loading) {
