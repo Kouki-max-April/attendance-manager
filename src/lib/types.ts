@@ -54,12 +54,6 @@ export interface SubjectStats {
   status: SubjectStatus
 }
 
-export interface AppUser {
-  id: string
-  name: string
-  color: string // アバター色
-}
-
 // PDF解析結果
 export interface ParsedLesson {
   subject_name: string
